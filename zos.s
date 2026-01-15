@@ -7,3 +7,6 @@
 
             .org 0x1000
             .include "cpy.s"
+
+            .org 0x1100
+            .include "loader.s"

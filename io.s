@@ -38,6 +38,17 @@ mass_io_helper:
                   otir                          ; output range
                   jr mass_io_helper
 
+; hl = address of str
+; clobbers a, hl, flags
+
+echo_str:
+                  ld a, (hl)
+                  or 0
+                  ret z
+                  call echo
+                  inc hl
+                  jr echo_str
+
 ; resets all I/O
 
 init_io:
@@ -52,6 +63,11 @@ init_io:
                   .byte 12                      ; 1843200 / 12 = 153600
 .init_io_ctc_end:
 
+                  .byte DMA                     ; reset DMA
+                  .byte .init_io_dma_end - .init_io_dma
+.init_io_dma:     .byte 0xC3                    ; reset
+.init_io_dma_end:
+
                   .byte SIOCB                   ; init SIOB for UART communication
                   .byte .init_io_sio_end - .init_io_sio
 .init_io_sio:     .byte 0b00011000              ; reset
@@ -64,9 +80,4 @@ init_io:
                   .byte 1                       ; reg 1
                   .byte 0b00000000              ; all int disable
 .init_io_sio_end:
-
-                  .byte DMA                     ; reset DMA
-                  .byte .init_io_dma_end - .init_io_dma
-.init_io_dma:     .byte 0xC3                    ; reset
-.init_io_dma_end:
                   .byte 0                       ; end of all

@@ -1,6 +1,8 @@
 
 ; This file is part of ZOS. © Joey Smalen
 
+; depends on mass_io_helper, echo
+
 ; A simple memcpy routine which uses the DMA to transfer 256 bytes from 0x5000
 ; to 0x6000. This is to test the DMA peripheral.
 
@@ -15,21 +17,20 @@ memcpy:
                   jr z, .dma_done
                   ld a, "#"
                   call echo
-                  ld a, 0xB3
-                  out (DMA), a
                   jr .dma_loop
 
 .dma_done:        ld a, "W"
                   call echo
 
-                  ld a, 0xC3                    ; reset
+                  ld a, 0x83                    ; disable dma
                   out (DMA), a
                   jp wozmon
 
 dma_configure_begin:
                   .byte DMA
                   .byte .dma_conf_data_end - .dma_conf_data
-.dma_conf_data:   .byte 0b01111101              ; transfer, A -> B
+.dma_conf_data:   .byte 0xC3                    ; reset
+                  .byte 0b01111101              ; transfer, A -> B
                   .byte 0x00                    ; start addr low
                   .byte 0x50                    ; start addr high (0x5000)
                   .byte 0x00                    ; len low
@@ -39,7 +40,7 @@ dma_configure_begin:
 
                   .byte 0b00010000              ; B increments, is memory
 
-                  .byte 0b11001101              ; burst mode
+                  .byte 0b10101101              ; continuous mode
                   .byte 0x00                    ; end addr low
                   .byte 0x60                    ; end addr high (0x6000)
 
