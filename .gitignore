@@ -7,3 +7,6 @@
 # File editor
 Session.vim
 *.swp
+
+# Binary
+a.out

@@ -24,7 +24,7 @@ memcpy:
 
                   ld a, 0x83                    ; disable dma
                   out (DMA), a
-                  jp wozmon
+                  jp shell
 
 dma_configure_begin:
                   .byte DMA
@@ -33,8 +33,8 @@ dma_configure_begin:
                   .byte 0b01111101              ; transfer, A -> B
                   .byte 0x00                    ; start addr low
                   .byte 0x50                    ; start addr high (0x5000)
-                  .byte 0x00                    ; len low
-                  .byte 0x01                    ; len high (256)
+                  .byte 0xFF                    ; len low
+                  .byte 0x00                    ; len high (256)
 
                   .byte 0b00010100              ; A increments, is memory
 

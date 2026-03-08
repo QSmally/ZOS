@@ -2,11 +2,11 @@
 ; This file is part of ZOS. © Joey Smalen
 
             .org 0x0000
-            .include "zmon.s"                   ; entrypoint
+            .include "boot.s"                   ; entrypoint
             .include "io.s"
+            .include "stdlib.s"
+            .include "zmon.s"                   ; reserves 0x4000 - 0x40FF
+            .include "shell.s"                  ; reserves 0x4100 - 0x41FF
 
-            .org 0x1000
-            .include "cpy.s"
-
-            .org 0x1100
+            .include "memcpy.s"
             .include "loader.s"

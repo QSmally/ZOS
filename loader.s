@@ -25,10 +25,10 @@ loader:
                   ld hl, .done_str
                   call echo_str
 
-                  jp wozmon
+                  jp shell
 
-.entry_str:       .asciiz " begin typing 16 characters into 0x5000... "
-.done_str:        .asciiz "done, returning to Wozmon "
+.entry_str:       .asciiz "\rbegin typing 16 characters into 0x5000...\r"
+.done_str:        .asciiz "done, returning to shell\r"
 
 loader_configure_begin:
                   .byte SIOCB

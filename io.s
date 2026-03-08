@@ -1,6 +1,7 @@
 
 ; This file is part of ZOS. © Joey Smalen
 
+DMA2 = 0x60       ; 0b011
 DMA = 0x80        ; 0b100
 PORTA = 0xA0      ; 0b101
 PORTB = 0xA1
@@ -15,6 +16,8 @@ CTC1 = 0xE1
 CTC2 = 0xE2
 CTC3 = 0xE3
 
+; mass execute I/O operations.
+;
 ; hl = address to mass I/O block format:
 ;     .byte I/O addr
 ;     .byte block len
@@ -38,18 +41,133 @@ mass_io_helper:
                   otir                          ; output range
                   jr mass_io_helper
 
+; echos the clear display sequence Esc[2J.
+; clobbers a, hl, flags
+
+echo_clear:
+                  ld hl, .clear_escseq
+                  jr echo_str
+
+.clear_escseq:    .byte 0x1B, 0x5B, 0x32, 0x4A, 0
+
+; echos a newline.
+; clobbers a, flags
+
+echo_newline:
+                  ld a, 0x0D
+                  jr echo
+
+; echo a null-terminated string.
 ; hl = address of str
 ; clobbers a, hl, flags
 
 echo_str:
                   ld a, (hl)
                   or 0
-                  ret z
+                  ret z                         ; return when done
                   call echo
                   inc hl
                   jr echo_str
 
+; echo a null-terminated format string, with arguments.
+;
+; hl = address of str
+; ix = %x
+; iy = %X
+;
+; clobbers a, hl, flags
+
+echo_format_str:
+                  ld a, (hl)
+                  or 0
+                  ret z                         ; return when done
+                  inc hl
+                  cp "%"                        ; is format char ahead?
+                  jr z, .fmt                    ; yes, do special stuff
+                  call echo                     ; no, just echo it
+                  jr echo_format_str
+
+.fmt:             ld a, (hl)
+                  or 0
+                  ret z                         ; return when done
+                  inc hl
+                  cp "%"                        ; is "%%"?
+                  call z, echo
+                  cp "x"                        ; is "%x"?
+                  jr z, .fmt_hex_ix
+                  cp "X"                        ; is "%X"?
+                  jr z, .fmt_hex_iy
+                  call echo                     ; otherwise, just echo itself
+                  jr echo_format_str
+
+.fmt_hex_ix:      ld a, ixh
+                  call echo_hex_byte            ; print ixh
+                  ld a, ixl
+                  call echo_hex_byte            ; print ixl
+                  jr echo_format_str
+
+.fmt_hex_iy:      ld a, iyh
+                  call echo_hex_byte            ; print iyh
+                  ld a, iyl
+                  call echo_hex_byte            ; print iyl
+                  jr echo_format_str
+
+; echo a hex byte, nibble or ASCII character.
+
+echo_hex_byte:
+                  push af                       ; save lower
+                  srl a                         ; move upper to lower
+                  srl a
+                  srl a
+                  srl a
+                  call echo_hex                 ; print upper
+                  pop af                        ; restore lower, print lower
+
+echo_hex:
+                  and 0x0F                      ; mask lower nibble
+                  or "0"                        ; offset by "0"
+                  cp 0x3A                       ; is digit?
+                  jp m, echo
+                  add 0x07                      ; offset by "0" to "A"
+
+echo:
+                  out (SIOB), a                 ; print character
+                  push af
+.sio_busy:        in a, (SIOCB)                 ; status word
+                  bit 2, a                      ; is buffer empty?
+                  jr z, .sio_busy               ; no, loop
+                  pop af
+                  ret
+
+; interprets register A as an ASCII hex character and shifts it into DE.
+; clobbers a, c, flags
+; returns m=1 if invalid character
+
+interpret:
+                  xor 0x30                      ; map to 0-9
+                  cp 0x0A                       ; is digit?
+                  jp m, .is_digit
+                  add 0x89                      ; map A-F to FA-FF
+                  cp 0xFA                       ; is hex letter?
+                  ret m                         ; return m=1 invalid char
+.is_digit:        sla a                         ; move lower to upper
+                  sla a
+                  sla a
+                  sla a
+
+                  ld c, 4                       ; shift count
+.hex_shift:       sla a                         ; carry = MSB
+                  rl e                          ; shift in e
+                  rl d                          ; shift in d
+                  dec c
+                  jp nz, .hex_shift             ; shift if not done yet
+                  ret                           ; zero means m=0
+
 ; resets all I/O
+;
+; CTC1 is configured for baudrate generation (for SIOB)
+; DMA & DMA2 is reset
+; SIOB is configured for 8N1 communication
 
 init_io:
                   ld hl, .init_io_begin
@@ -62,6 +180,11 @@ init_io:
 .init_io_ctc:     .byte 0b01010101              ; counter mode, rising edge
                   .byte 12                      ; 1843200 / 12 = 153600
 .init_io_ctc_end:
+
+                  .byte DMA2                    ; reset DMA2
+                  .byte .init_io_dma2_end - .init_io_dma2
+.init_io_dma2:    .byte 0xC3                    ; reset
+.init_io_dma2_end:
 
                   .byte DMA                     ; reset DMA
                   .byte .init_io_dma_end - .init_io_dma
